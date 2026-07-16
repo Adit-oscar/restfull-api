@@ -1,0 +1,53 @@
+const jwt = require("jsonwebtoken");
+
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Access denied. No token provided.",
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(403).json({
+      success: false,
+      message: "Invalid or expired token.",
+    });
+  }
+};
+
+const authorizeRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    // 1. Pastikan req.user ada (artinya verifyToken harus dijalankan LEBIH DAHULU)
+    if (!req.user) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "Internal server error: User context not found. Ensure verifyToken is called first.",
+      });
+    }
+
+    // 2. Cek apakah role milik user termasuk dalam role yang diizinkan
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `Access denied. Your role (${req.user.role}) does not have permission to access this resource.`,
+      });
+    }
+
+    // 3. Jika cocok, silakan lanjut ke controller
+    next();
+  };
+};
+
+module.exports = {
+  verifyToken,
+  authorizeRoles,
+};
