@@ -1,7 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const model = require("../middleware/models/auth");
+const model = require("../models/auth");
 const [google, oauth2Client] = require("../config/oauth2");
 
 const register = async (req, res) => {

@@ -1,6 +1,6 @@
-const dbPool = require("../../config/database.js");
+const dbPool = require("../config/database.js");
 
-// Membuat user baru saat registrasi
+// Membuat user baru saat registrasi / OAuth
 const create = async (userData) => {
   const {
     name,
@@ -19,17 +19,15 @@ const create = async (userData) => {
     username,
     email,
     password,
-    role,
+    role || "USER",
     auth_provider || "local",
-    profile_picture || null, // Simpan URL foto jika ada, jika tidak set null
+    profile_picture || null,
   ]);
   return result.insertId;
 };
 
 const findUserByUsernameOrEmail = async (username, email = null) => {
   const searchEmail = email || username;
-
-  // PERBAIKAN: Tambahkan profile_picture ke dalam SELECT
   const query =
     "SELECT id, name, username, email, password, role, auth_provider, profile_picture FROM users WHERE username = ? OR email = ?";
 
