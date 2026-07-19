@@ -1,6 +1,8 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const model = require("../models/auth");
+const crypto = require("crypto");
+const model = require("../middleware/models/auth");
+const [google, oauth2Client] = require("../config/oauth2");
 
 const register = async (req, res) => {
   try {
@@ -50,6 +52,7 @@ const register = async (req, res) => {
       email,
       password: hashedPassword,
       role: defaultRole,
+      auth_provider: "local",
     });
 
     // 5. Kembalikan respon sukses
@@ -95,6 +98,14 @@ const login = async (req, res) => {
       });
     }
 
+    // Cek apakah akun ini didaftarkan via Google
+    if (user[0].auth_provider === "google") {
+      return res.status(400).json({
+        success: false,
+        message: "This account uses Google Login. Please sign in with Google.",
+      });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user[0].password);
 
     if (!isPasswordValid) {
@@ -128,4 +139,114 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { register, login };
+const googleAuth = (req, res) => {
+  const scopes = [
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/userinfo.email",
+  ];
+
+  const authUrl = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    scope: scopes,
+    include_granted_scopes: true,
+  });
+
+  res.redirect(authUrl);
+};
+
+const googleCallback = async (req, res) => {
+  try {
+    const { code } = req.query;
+
+    if (!code) {
+      // Jika user membatalkan login di Google screen
+      return res.redirect("http://localhost:5173/login?error=auth_cancelled");
+    }
+
+    // 1. Tukar code dari URL menjadi access token Google
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+
+    // 2. Ambil informasi profile user dari Google API
+    const oauth2 = google.oauth2({
+      auth: oauth2Client,
+      version: "v2",
+    });
+
+    const userInfo = await oauth2.userinfo.get();
+    const { id: googleId, email, name, picture } = userInfo.data;
+
+    // 3. Cek apakah email user sudah terdaftar di database lokal
+    let userResult = await model.findUserByUsernameOrEmail(email);
+    let targetUser;
+
+    if (userResult.length === 0) {
+      // Jika email belum ada, daftarkan otomatis sebagai user baru
+      // Username di-generate otomatis dari bagian depan email agar unik
+      const autoUsername =
+        email.split("@")[0] + "_" + Math.floor(Math.random() * 1000);
+      const defaultRole = "USER";
+
+      const randomPassword = crypto.randomBytes(32).toString("hex");
+
+      const saltRount = 10;
+      const hashedPassword = await bcrypt.hash(randomPassword, saltRount);
+
+      const newUserId = await model.create({
+        name: name || autoUsername,
+        username: autoUsername,
+        email: email,
+        password: hashedPassword,
+        role: defaultRole,
+        auth_provider: "google",
+        profile_picture: picture,
+      });
+
+      targetUser = {
+        id: newUserId,
+        username: autoUsername,
+        role: defaultRole,
+        profile_picture: picture,
+      };
+    } else {
+      // Jika user sudah terdaftar sebelumnya
+      targetUser = userResult[0];
+    }
+
+    // 4. Buat JWT internal lokal dengan format yang persis sama seperti method login() biasa
+    const token = jwt.sign(
+      {
+        id: targetUser.id,
+        username: targetUser.username,
+        role: targetUser.role,
+        profile_picture: targetUser.profile_picture,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" },
+    );
+
+    // 5. Lempar token ke Frontend (Contoh alamat React Anda)
+
+    // cara 1 redirect ke frontend
+    // return res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+
+    // cara 2 kirim token sebagai JSON response
+    return res.json({
+      success: true,
+      message: "Google OAuth login successful",
+      token,
+    });
+  } catch (error) {
+    console.error("Error during Google OAuth Callback:", error);
+    // error cara 1
+    // return res.redirect("http://localhost:5173/login?error=server_error");
+
+    // error cara 2
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during Google OAuth",
+    });
+  }
+};
+
+module.exports = { register, login, googleAuth, googleCallback };

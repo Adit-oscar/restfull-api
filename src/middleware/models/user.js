@@ -1,8 +1,8 @@
-const dbPool = require("../config/database.js");
+const dbPool = require("../../config/database.js");
 
 const getAllUsers = async () => {
   const query =
-    "SELECT id, name, username, email, role, createdAt, updatedAt FROM users";
+    "SELECT id, name, username, email, auth_provider, role, profile_picture, createdAt, updatedAt FROM users";
 
   const [rows] = await dbPool.execute(query);
   return rows;
@@ -22,16 +22,25 @@ const findUserByUsernameOrEmail = async (username, email) => {
   return rows;
 };
 
-const create = async (name, username, email, password, role) => {
+const create = async (
+  name,
+  username,
+  email,
+  password,
+  role,
+  profile_picture = null,
+) => {
   const query =
-    "INSERT INTO users (name, username, email, password, role) VALUES (?, ?, ?, ?, ?)";
+    "INSERT INTO users (name, username, email, password, auth_provider, role, profile_picture ) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
   const [result] = await dbPool.execute(query, [
     name,
     username,
     email,
     password,
+    "local",
     role,
+    profile_picture,
   ]);
 
   return result.insertId;

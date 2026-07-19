@@ -1,5 +1,5 @@
 const bcrypt = require("bcrypt");
-const model = require("../models/user.js");
+const model = require("../middleware/models/user.js");
 
 const getAllUsers = async (req, res) => {
   try {
@@ -45,7 +45,14 @@ const getUserById = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { name, username, email, password, role } = req.body;
+    const {
+      name,
+      username,
+      email,
+      password,
+      role,
+      profile_picture = "",
+    } = req.body;
 
     // Validasi input
     if (!name || !username || !email || !password) {
@@ -83,12 +90,14 @@ const createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     const userRole = role || "USER"; // Default role jika tidak diberikan
+    const auth_provider = "local";
     const result = await model.create(
       name,
       username,
       email,
       hashedPassword,
       userRole,
+      profile_picture,
     );
 
     return res.status(201).json({
