@@ -137,6 +137,10 @@ const updateUser = async (req, res) => {
           existingUser.username === username &&
           existingUser.id !== parseInt(id)
         ) {
+          if (req.file) {
+            fs.unlinkSync(req.file.path);
+          }
+
           return res
             .status(409)
             .json({ success: false, message: "Username already exists" });
@@ -147,6 +151,10 @@ const updateUser = async (req, res) => {
           existingUser.email === email &&
           existingUser.id !== parseInt(id)
         ) {
+          if (req.file) {
+            fs.unlinkSync(req.file.path);
+          }
+
           return res
             .status(409)
             .json({ success: false, message: "Email already exists" });
