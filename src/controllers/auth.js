@@ -228,24 +228,26 @@ const googleCallback = async (req, res) => {
     // 5. Lempar token ke Frontend (Contoh alamat React Anda)
 
     // cara 1 redirect ke frontend
-    // return res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+    return res.redirect(
+      `http://localhost:5173/auth/oauth-success?token=${token}`,
+    );
 
     // cara 2 kirim token sebagai JSON response
-    return res.json({
-      success: true,
-      message: "Google OAuth login successful",
-      token,
-    });
+    // return res.json({
+    //   success: true,
+    //   message: "Google OAuth login successful",
+    //   token,
+    // });
   } catch (error) {
     console.error("Error during Google OAuth Callback:", error);
     // error cara 1
-    // return res.redirect("http://localhost:5173/login?error=server_error");
+    return res.redirect("http://localhost:5173/auth/login?error=server_error");
 
     // error cara 2
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error during Google OAuth",
-    });
+    // return res.status(500).json({
+    //   success: false,
+    //   message: "Internal server error during Google OAuth",
+    // });
   }
 };
 
