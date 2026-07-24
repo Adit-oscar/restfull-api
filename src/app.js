@@ -1,6 +1,7 @@
 const express = require("express");
 const env = require("dotenv");
 const path = require("path");
+const cors = require("cors");
 
 // import routes
 const authRoutes = require("./routes/auth.js");
@@ -15,6 +16,12 @@ const PORT = process.env.PORT || 8000;
 app.use(express.json());
 // Ganti baris statis lama dengan ini:
 app.use("/public", express.static(path.join(__dirname, "public")));
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  }),
+);
 
 app.get("/", (req, res) => {
   res.json({

@@ -4,21 +4,32 @@ const verifyToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
 
+  // 1. Jika token tidak dikirim sama sekali
   if (!token) {
     return res.status(401).json({
       success: false,
-      message: "Access denied. No token provided.",
+      message: "Akses ditolak. Token tidak ditemukan.",
     });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
+    req.user = decoded; // Menyimpan payload JWT (misal: id, email, role) ke req.user
+    next(); // Lanjut ke controller berikutnya
   } catch (error) {
-    return res.status(403).json({
+    // 2. Tangkap error spesifik jika token Kedaluwarsa (Expired)
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Sesi Anda telah berakhir (Token Expired). Silakan login kembali.",
+      });
+    }
+
+    // 3. Tangkap error jika token Rusak / Ditembus secara ilegal (JsonWebTokenError)
+    return res.status(401).json({
       success: false,
-      message: "Invalid or expired token.",
+      message: "Token tidak valid.",
     });
   }
 };
