@@ -1,124 +1,326 @@
-# 🚀 Node.js Express RESTful API - Authentication & User Management
+# 🚀 RESTful API Backend dengan Node.js dan Express
 
-Repositori ini berisi implementasi backend RESTful API menggunakan Node.js dan framework Express. Proyek ini dilengkapi dengan sistem autentikasi fleksibel (login menggunakan Username atau Email), enkripsi password, pengamanan endpoint menggunakan JSON Web Token (JWT), serta pembatasan hak akses berbasis peran (Role-Based Access Control / RBAC).
+Proyek ini adalah backend REST API berbasis Node.js, Express, dan MySQL yang mendukung:
+- autentikasi pengguna dengan JWT
+- role-based access control (ADMIN / USER)
+- manajemen user
+- CRUD produk
+- upload gambar produk
+- pencarian dan pagination produk
+- transaksi pembelian sederhana
 
-# ✨ Fitur Utama
-Flexible Authentication: Registrasi akun baru dan login dinamis menggunakan username ATAU email.
-Password Security: Pengamanan kata sandi menggunakan hashing bcrypt.
-Route Protection: Middleware verifikasi JWT untuk melindungi endpoint privat.
-Role-Based Authorization: Middleware khusus untuk membatasi akses endpoint tertentu (misal: fitur hapus hanya untuk ADMIN).
-Database Connection: Integrasi database MySQL menggunakan mysql2 dengan skema Connection Pool yang efisien.
+## ✨ Fitur utama
+- Registrasi dan login pengguna
+- Login dengan username atau email
+- Enkripsi password menggunakan bcrypt
+- Proteksi endpoint dengan JWT
+- Otorisasi akses berdasarkan role
+- Upload gambar profil dan gambar produk
+- Pagination dan pencarian produk untuk performa frontend yang lebih baik
+- Transaksi yang mengurangi stok produk otomatis
 
-# 📁 Struktur Direktori Proyek
-```
-├── config/
-│   └── database.js       # Konfigurasi koneksi MySQL Pool
-├── controllers/
-│   ├── auth.js           # Logika Register & Login (Generate JWT)
-│   └── user.js           # Logika CRUD Data Pengguna
-├── middleware/
-│   ├── auth.js           # Middleware verifikasi token JWT
-│   └── roleCheck.js      # Middleware otorisasi Role (Admin/User)
-├── models/
-│   ├── auth.js           # Query database untuk keperluan Autentikasi
-│   └── user.js           # Query database untuk keperluan CRUD User
-├── routes/
-│   ├── auth.js           # Routing publik (Login & Register)
-│   └── user.js           # Routing privat (Protected dengan Middleware)
-├── .env.example          # Cetakan template konfigurasi environment
-├── .gitignore            # Daftar file yang diabaikan oleh Git
-├── index.js              # Entry point utama aplikasi Express
-├── package.json          # Dependency proyek
-└── README.md             # Dokumentasi proyek
+## 🛠️ Teknologi yang digunakan
+- Node.js
+- Express.js
+- MySQL (mysql2)
+- JWT (jsonwebtoken)
+- bcrypt
+- multer untuk upload file
+- CORS
+- dotenv
+
+## 📁 Struktur folder proyek
+```text
+src/
+  app.js
+  config/
+    database.js
+    oauth2.js
+  controllers/
+    auth.js
+    product.js
+    transaction.js
+    user.js
+  database/
+    init.js
+    seeders/
+      productSeeder.js
+  middleware/
+    auth.js
+    productUpload.js
+    upload.js
+  models/
+    auth.js
+    product.js
+    transaction.js
+    user.js
+  routes/
+    auth.js
+    product.js
+    transaction.js
+    user.js
+public/
+  uploads/
+    profiles/
+    products/
 ```
 
-# 🗄️ Skema Database (MySQL)
-Sebelum menjalankan aplikasi, pastikan Anda telah membuat database dan tabel users berikut di MySQL Anda:
-```
-CREATE TABLE users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  username VARCHAR(100) UNIQUE NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  role ENUM('ADMIN', 'USER') DEFAULT 'USER',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+## ⚙️ Persiapan environment
+Buat file .env di root project dengan isi berikut:
+```env
+PORT=8000
+HOST=localhost
+USER=root
+PASSWORD=
+DATABASE=restfull-api
+JWT_SECRET=your_secret_key_here
 ```
 
-# 🛠️ Langkah Instalasi & Penggunaan
-1. Kloning Repositori
-```
-git clone https://github.com/Adit-oscar/restfull-api.git
-cd restfull-api
-```
+> Pastikan MySQL sudah berjalan dan database yang disebutkan tersedia.
 
-2. Instal Dependency
-```
+## ▶️ Cara menjalankan proyek
+1. Install dependency
+```bash
 npm install
 ```
 
-3. Konfigurasi Environment (.env)
-Buat file baru di root folder dengan nama .env kemudian buka file .env tersebut dan sesuaikan kredensial database serta kunci rahasia JWT milik Anda:
-```
-PORT=3000
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=nama_database_kamu
-JWT_SECRET=kunci_rahasia_super_aman_123!
+2. Jalankan inisialisasi database
+```bash
+npm run db:init
 ```
 
-4. Menjalankan Aplikasi
+3. Jalankan seed produk awal (20 produk sample)
+```bash
+node src/database/seeders/productSeeder.js
 ```
+
+4. Jalankan server
+```bash
 npm run dev
 ```
 
-Server akan aktif dan berjalan di http://localhost:port_dalam_env.
+Server akan berjalan di:
+```text
+http://localhost:8000
+```
 
-🛣️ Rincian API Endpoint (API Documentation)
+## 🗄️ Struktur database
+Beberapa tabel yang dibuat secara otomatis oleh script inisialisasi:
+- users
+- products
+- transactions
+- transaction_items
 
-🔓 Endpoint Publik (Tanpa Token)
+### Tabel users
+- id
+- name
+- username
+- email
+- password
+- role
+- profile_picture
+- auth_provider
+- createdAt
+- updatedAt
 
+### Tabel products
+- id
+- name
+- description
+- price
+- stock
+- image
+- createdAt
+- updatedAt
 
-HTTP Method
-Endpoint
-Fungsi
-Payload (Request Body)
-POST
-/api/auth/register
-Mendaftarkan akun user baru
-{ "name", "username", "email", "password" }
-POST
-/api/auth/login
-Masuk ke sistem (Mendapatkan JWT)
-{ "identifier", "password" }
+### Tabel transactions
+- id
+- user_id
+- total_amount
+- status
+- createdAt
+- updatedAt
 
-💡 Tip Login: Kolom identifier dapat diisi menggunakan username ataupun email terdaftar Anda.
-🔒 Endpoint Privat (Membutuhkan Header Authorization)
-Semua endpoint di bawah ini wajib melampirkan token JWT pada bagian Headers request Anda:
-Key: Authorization
-Value: Bearer <TOKEN_JWT_KAMU>
-HTTP Method
-Endpoint
-Hak Akses (Role)
-Fungsi
-GET
-/api/users
-ADMIN
-Mengambil seluruh daftar user
-GET
-/api/users/:id
-ADMIN, USER
-Mengambil detail profil user tertentu
-PUT
-/api/users/:id
-ADMIN, USER
-Memperbarui data pengguna
-DELETE
-/api/users/:id
-ADMIN
-Menghapus user dari sistem
+### Tabel transaction_items
+- id
+- transaction_id
+- product_id
+- quantity
+- price
+- createdAt
 
-🛡️ Keamanan & Penanganan Berkas
-Proyek ini dikonfigurasi menggunakan .gitignore untuk memastikan berkas sensitif seperti konfigurasi .env dan folder penyimpanan node_modules tidak terunggah ke repositori publik demi menjaga keamanan data server dan efisiensi penyimpanan kode.
+## 🔐 Autentikasi
+Semua endpoint yang membutuhkan akses pribadi menggunakan header berikut:
+```http
+Authorization: Bearer <token>
+```
+
+Token didapatkan dari endpoint login atau register.
+
+## 📚 Daftar endpoint
+
+### 1. Auth
+
+| Method | Endpoint | Akses | Keterangan |
+|---|---|---|---|
+| GET | /auth/google | Publik | Redirect ke OAuth Google |
+| GET | /auth/google/callback | Publik | Callback OAuth Google |
+| POST | /auth/register | Publik | Registrasi user baru |
+| POST | /auth/login | Publik | Login user dan dapatkan JWT |
+
+#### Contoh request register
+```json
+{
+  "name": "Budi",
+  "username": "budi123",
+  "email": "budi@example.com",
+  "password": "rahasia123"
+}
+```
+
+#### Contoh request login
+```json
+{
+  "identifier": "budi123",
+  "password": "rahasia123"
+}
+```
+
+---
+
+### 2. User
+
+| Method | Endpoint | Akses | Keterangan |
+|---|---|---|---|
+| GET | /users | ADMIN | Ambil semua user |
+| GET | /users/:id | ADMIN / USER | Ambil detail user |
+| POST | /users | ADMIN | Buat user baru |
+| PATCH | /users/:id | ADMIN | Update data user |
+| DELETE | /users/:id | ADMIN | Hapus user |
+
+#### Upload foto profil
+Untuk route POST/PATCH /users, gunakan form-data dengan field:
+- profile_picture
+
+Contoh form-data:
+- field: profile_picture
+- value: file gambar
+
+---
+
+### 3. Product
+
+| Method | Endpoint | Akses | Keterangan |
+|---|---|---|---|
+| GET | /products | Publik | Ambil list produk dengan pagination dan search |
+| GET | /products/:id | Publik | Ambil detail produk |
+| POST | /products | ADMIN | Tambah produk baru |
+| PATCH | /products/:id | ADMIN | Update produk |
+| DELETE | /products/:id | ADMIN | Hapus produk |
+
+#### Query parameter untuk GET /products
+- search: kata kunci pencarian (nama/deskripsi)
+- page: nomor halaman
+- limit: jumlah data per halaman
+
+Contoh:
+```text
+GET /products?search=laptop&page=1&limit=10
+```
+
+#### Contoh request create product
+Gunakan form-data:
+- name
+- description
+- price
+- stock
+- image
+
+Contoh body JSON untuk API client yang mendukung multipart:
+```text
+name: Laptop Acer
+description: Laptop ringan untuk kerja
+price: 7990000
+stock: 10
+image: file gambar
+```
+
+---
+
+### 4. Transaction
+
+| Method | Endpoint | Akses | Keterangan |
+|---|---|---|---|
+| POST | /transactions | USER / ADMIN | Buat transaksi pembelian |
+| GET | /transactions | USER / ADMIN | Ambil riwayat transaksi user login |
+
+#### Contoh request create transaction
+```json
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    },
+    {
+      "productId": 3,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+#### Aturan transaksi
+- stok akan dicek sebelum transaksi diproses
+- jika stok tidak mencukupi, transaksi ditolak
+- stok produk akan dikurangi otomatis saat transaksi berhasil
+
+---
+
+## 📦 Response format
+Secara umum, response API mengikuti format berikut:
+
+### Success
+```json
+{
+  "success": true,
+  "message": "Operasi berhasil",
+  "data": {}
+}
+```
+
+### Error
+```json
+{
+  "success": false,
+  "message": "Pesan error"
+}
+```
+
+## ✅ Notes penting
+- Endpoint GET /products sudah dilengkapi dengan pagination dan search, sehingga frontend tidak perlu mengambil semua data sekaligus.
+- Upload file disimpan di folder public/uploads.
+- Gambar produk akan tersimpan di public/uploads/products.
+- Gambar profil user akan tersimpan di public/uploads/profiles.
+
+## 🧪 Contoh test cepat
+### Login
+```bash
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"identifier":"admin","password":"password"}'
+```
+
+### Ambil produk
+```bash
+curl http://localhost:8000/products?page=1&limit=10
+```
+
+### Buat transaksi
+```bash
+curl -X POST http://localhost:8000/transactions \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"productId":1,"quantity":1}]}'
+```
+

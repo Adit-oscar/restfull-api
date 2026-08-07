@@ -6,6 +6,8 @@ const cors = require("cors");
 // import routes
 const authRoutes = require("./routes/auth.js");
 const userRoutes = require("./routes/user.js");
+const productRoutes = require("./routes/product.js");
+const transactionRoutes = require("./routes/transaction.js");
 
 const app = express();
 
@@ -32,6 +34,8 @@ app.get("/", (req, res) => {
 
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
+app.use("/products", productRoutes);
+app.use("/transactions", transactionRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

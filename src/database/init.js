@@ -52,6 +52,56 @@ async function initialDatabase() {
     await dbPool.execute(queryCreateTableUser);
     console.log("Tabel users berhasil dibuat/diverifikasi");
 
+    const queryCreateTableProducts = `
+      CREATE TABLE IF NOT EXISTS products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        stock INT NOT NULL DEFAULT 0,
+        image TEXT NULL,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      );
+    `;
+
+    console.log("Membuat tabel products...");
+    await dbPool.execute(queryCreateTableProducts);
+    console.log("Tabel products berhasil dibuat/diverifikasi");
+
+    const queryCreateTableTransactions = `
+      CREATE TABLE IF NOT EXISTS transactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        total_amount DECIMAL(10,2) NOT NULL,
+        status VARCHAR(20) DEFAULT 'completed',
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+    `;
+
+    const queryCreateTableTransactionItems = `
+      CREATE TABLE IF NOT EXISTS transaction_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        transaction_id INT NOT NULL,
+        product_id INT NOT NULL,
+        quantity INT NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (transaction_id) REFERENCES transactions(id),
+        FOREIGN KEY (product_id) REFERENCES products(id)
+      );
+    `;
+
+    console.log("Membuat tabel transactions...");
+    await dbPool.execute(queryCreateTableTransactions);
+    console.log("Tabel transactions berhasil dibuat/diverifikasi");
+
+    console.log("Membuat tabel transaction_items...");
+    await dbPool.execute(queryCreateTableTransactionItems);
+    console.log("Tabel transaction_items berhasil dibuat/diverifikasi");
+
     // Tutup pool agar script Node.js berhenti otomatis
     await dbPool.end();
 
