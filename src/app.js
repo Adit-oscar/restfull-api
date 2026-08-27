@@ -8,6 +8,7 @@ const authRoutes = require("./routes/auth.js");
 const userRoutes = require("./routes/user.js");
 const productRoutes = require("./routes/product.js");
 const transactionRoutes = require("./routes/transaction.js");
+const paymentRoutes = require("./routes/payment.js");
 
 const app = express();
 
@@ -36,7 +37,12 @@ app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/products", productRoutes);
 app.use("/transactions", transactionRoutes);
+app.use("/payments", paymentRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

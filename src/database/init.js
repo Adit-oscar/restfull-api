@@ -4,6 +4,33 @@ const env = require("dotenv");
 // PENTING: Load env di paling atas
 env.config();
 
+const tableExists = async (dbPool, tableName) => {
+  const [rows] = await dbPool.execute(
+    `SELECT COUNT(*) AS total
+     FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = ?`,
+    [tableName],
+  );
+  return rows[0].total > 0;
+};
+
+const tableHasData = async (dbPool, tableName) => {
+  const [rows] = await dbPool.execute(`SELECT 1 FROM \`${tableName}\` LIMIT 1`);
+  return rows.length > 0;
+};
+
+const recreateEmptyTable = async (dbPool, tableName) => {
+  if (await tableExists(dbPool, tableName)) {
+    if (await tableHasData(dbPool, tableName)) {
+      console.log(`Tabel ${tableName} memiliki data; tabel dipertahankan`);
+      return;
+    }
+
+    await dbPool.execute(`DROP TABLE \`${tableName}\``);
+    console.log(`Tabel ${tableName} kosong; tabel dihapus untuk dibuat ulang`);
+  }
+};
+
 async function initialDatabase() {
   let tempConnection;
 
@@ -32,6 +59,17 @@ async function initialDatabase() {
     // Perbaikan: Impor dbPool DI SINI (setelah database dipastikan ada)
     const dbPool = require("../config/database");
 
+    // Hapus hanya tabel kosong. Data pada tabel yang sudah digunakan tidak dihapus.
+    // Urutan terbalik menjaga foreign key transaction_items -> transactions/products.
+    for (const tableName of [
+      "transaction_items",
+      "transactions",
+      "products",
+      "users",
+    ]) {
+      await recreateEmptyTable(dbPool, tableName);
+    }
+
     // Perbaikan: Tambahkan koma setelah kolom createdAt dan gunakan IF NOT EXISTS
     const queryCreateTableUser = `
       CREATE TABLE IF NOT EXISTS users (
@@ -59,6 +97,7 @@ async function initialDatabase() {
         description TEXT NULL,
         price DECIMAL(10,2) NOT NULL,
         stock INT NOT NULL DEFAULT 0,
+        reserved_stock INT NOT NULL DEFAULT 0,
         image TEXT NULL,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -73,8 +112,14 @@ async function initialDatabase() {
       CREATE TABLE IF NOT EXISTS transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
+        order_id VARCHAR(100) NOT NULL UNIQUE,
+        payment_provider VARCHAR(30) NOT NULL DEFAULT 'midtrans',
         total_amount DECIMAL(10,2) NOT NULL,
-        status VARCHAR(20) DEFAULT 'completed',
+        status VARCHAR(20) DEFAULT 'pending',
+        payment_status VARCHAR(20) DEFAULT 'pending',
+        payment_token VARCHAR(255) NULL,
+        payment_expiry DATETIME NULL,
+        paid_at DATETIME NULL,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
@@ -101,6 +146,44 @@ async function initialDatabase() {
     console.log("Membuat tabel transaction_items...");
     await dbPool.execute(queryCreateTableTransactionItems);
     console.log("Tabel transaction_items berhasil dibuat/diverifikasi");
+
+    const alterStatements = [
+      "ALTER TABLE products ADD COLUMN IF NOT EXISTS reserved_stock INT NOT NULL DEFAULT 0",
+      "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS order_id VARCHAR(100) NULL",
+      "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_provider VARCHAR(30) NOT NULL DEFAULT 'midtrans'",
+      "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) NOT NULL DEFAULT 'pending'",
+      "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_token VARCHAR(255) NULL",
+      "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_expiry DATETIME NULL",
+      "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS paid_at DATETIME NULL",
+    ];
+
+    for (const statement of alterStatements) {
+      await dbPool.execute(statement);
+    }
+
+    await dbPool.execute(
+      "ALTER TABLE transactions MODIFY COLUMN payment_provider VARCHAR(30) NOT NULL DEFAULT 'midtrans'",
+    );
+    await dbPool.execute(
+      "ALTER TABLE transactions MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'pending'",
+    );
+    await dbPool.execute(
+      "ALTER TABLE transactions MODIFY COLUMN payment_status VARCHAR(20) NOT NULL DEFAULT 'pending'",
+    );
+
+    await dbPool.execute(
+      "UPDATE transactions SET order_id = CONCAT('LEGACY-', id) WHERE order_id IS NULL",
+    );
+    await dbPool.execute(
+      "ALTER TABLE transactions MODIFY COLUMN order_id VARCHAR(100) NOT NULL",
+    );
+    try {
+      await dbPool.execute(
+        "ALTER TABLE transactions ADD UNIQUE INDEX idx_transactions_order_id (order_id)",
+      );
+    } catch (error) {
+      if (error.code !== "ER_DUP_KEYNAME") throw error;
+    }
 
     // Tutup pool agar script Node.js berhenti otomatis
     await dbPool.end();
