@@ -10,7 +10,10 @@ const createPendingTransaction = async (transactionData) => {
     await connection.beginTransaction();
 
     const lockedItems = [];
-    for (const item of items) {
+    const itemsByProduct = [...items].sort(
+      (left, right) => left.productId - right.productId,
+    );
+    for (const item of itemsByProduct) {
       const [productRows] = await connection.execute(
         "SELECT id, name, price, stock, reserved_stock FROM products WHERE id = ? FOR UPDATE",
         [item.productId],
@@ -69,6 +72,18 @@ const cancelPendingTransaction = async (transactionId) => {
   const connection = await dbPool.getConnection();
   try {
     await connection.beginTransaction();
+
+    // RACE-CONDITION GUARD: serialize cancellation with payment updates.
+    const [transactions] = await connection.execute(
+      "SELECT id, status FROM transactions WHERE id = ? FOR UPDATE",
+      [transactionId],
+    );
+    const transaction = transactions[0];
+    if (!transaction || transaction.status !== "pending") {
+      await connection.commit();
+      return false;
+    }
+
     const [items] = await connection.execute(
       "SELECT product_id, quantity FROM transaction_items WHERE transaction_id = ? FOR UPDATE",
       [transactionId],
@@ -80,10 +95,11 @@ const cancelPendingTransaction = async (transactionId) => {
       );
     }
     await connection.execute(
-      "UPDATE transactions SET status = 'failed', payment_status = 'failed' WHERE id = ? AND status = 'pending'",
+      "UPDATE transactions SET status = 'failed', payment_status = 'failed' WHERE id = ?",
       [transactionId],
     );
     await connection.commit();
+    return true;
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -133,7 +149,7 @@ const applyPaymentStatus = async (orderId, paymentStatus) => {
     }
 
     const [items] = await connection.execute(
-      "SELECT product_id, quantity FROM transaction_items WHERE transaction_id = ?",
+      "SELECT product_id, quantity FROM transaction_items WHERE transaction_id = ? ORDER BY product_id",
       [transaction.id],
     );
     if (paymentStatus === "paid") {
