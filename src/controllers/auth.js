@@ -4,6 +4,64 @@ const crypto = require("crypto");
 const model = require("../models/auth");
 const [google, oauth2Client] = require("../config/oauth2");
 
+const checkAvailability = async (req, res) => {
+  try {
+    const { username, email } = req.body;
+
+    if (!username && !email) {
+      return res.status(400).json({
+        success: false,
+        available: false,
+        message: "Username or email is required",
+      });
+    }
+
+    const existingUsers = await model.findUserByUsernameOrEmail(
+      username,
+      email,
+    );
+    const duplicates = [];
+
+    if (username && existingUsers.some((user) => user.username === username)) {
+      duplicates.push("username");
+    }
+
+    if (email && existingUsers.some((user) => user.email === email)) {
+      duplicates.push("email");
+    }
+
+    if (duplicates.length > 0) {
+      const duplicateMessage =
+        duplicates.length === 2
+          ? "Username and email already registered"
+          : duplicates[0] === "username"
+            ? "Username already exists"
+            : "Email already exists";
+
+      return res.status(409).json({
+        success: false,
+        available: false,
+        duplicates,
+        message: duplicateMessage,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      available: true,
+      duplicates: [],
+      message: "Username and email are available",
+    });
+  } catch (error) {
+    console.error("Error checking availability:", error);
+    return res.status(500).json({
+      success: false,
+      available: false,
+      message: "Internal server error",
+    });
+  }
+};
+
 const register = async (req, res) => {
   try {
     const { name, username, email, password } = req.body;
@@ -251,4 +309,10 @@ const googleCallback = async (req, res) => {
   }
 };
 
-module.exports = { register, login, googleAuth, googleCallback };
+module.exports = {
+  register,
+  login,
+  googleAuth,
+  googleCallback,
+  checkAvailability,
+};
