@@ -1,192 +1,214 @@
-# 🚀 RESTful API Backend dengan Node.js dan Express
+# RESTful API Backend - Dokumentasi Proyek
 
-Proyek ini adalah backend REST API berbasis Node.js, Express, dan MySQL yang mendukung:
-- autentikasi pengguna dengan JWT
-- role-based access control (ADMIN / USER)
-- manajemen user
-- CRUD produk
-- upload gambar produk
-- pencarian dan pagination produk
-- transaksi pembelian sederhana
-- pembayaran online melalui Midtrans Snap
+Proyek ini adalah backend aplikasi e-commerce yang dibangun dengan Node.js dan Express. Fokus utama sistem ini adalah autentikasi pengguna, manajemen data produk, penyimpanan transaksi, dan integrasi pembayaran online menggunakan Midtrans.
 
-## ✨ Fitur utama
+Tujuan utama aplikasi ini adalah menyediakan layanan backend yang aman, konsisten, dan siap dipakai oleh frontend seperti React, Vue, atau mobile app.
+
+## 1. Ringkasan proyek
+
+Aplikasi ini memiliki beberapa fitur utama:
 - Registrasi dan login pengguna
-- Login dengan username atau email
-- Enkripsi password menggunakan bcrypt
-- Proteksi endpoint dengan JWT
-- Otorisasi akses berdasarkan role
-- Upload gambar profil dan gambar produk
-- Pagination dan pencarian produk untuk performa frontend yang lebih baik
-- Transaksi yang mengurangi stok produk otomatis
-- Order pending dengan Snap Token dan webhook terverifikasi
-- Reservasi stok selama pembayaran belum selesai
+- Login lokal dengan username atau email
+- Login OAuth dengan Google
+- JWT untuk autentikasi dan otorisasi
+- Role-based access control (USER dan ADMIN)
+- CRUD users dan produk
+- Upload foto profil dan gambar produk
+- Pencarian dan paginasi pada data produk
+- Transaksi belanja dengan pengelolaan stok
+- Reservasi stok saat order dibuat
+- Integrasi pembayaran Midtrans Snap
+- Webhook verifikasi notifikasi pembayaran
+- Uji otomatis untuk validasi fungsi utama
 
-## 🛠️ Teknologi yang digunakan
+## 2. Teknologi yang digunakan
 - Node.js
 - Express.js
-- MySQL (mysql2)
+- MySQL dan mysql2
 - JWT (jsonwebtoken)
 - bcrypt
-- multer untuk upload file
+- multer
 - CORS
 - dotenv
+- Midtrans SDK
+- Google OAuth 2.0 API
 
-## 📁 Struktur folder proyek
+## 3. Arsitektur aplikasi
+
+Struktur inti backend terdiri dari beberapa layer:
+
+- app.js: entry point aplikasi Express
+- routes/: mendefinisikan endpoint HTTP
+- controllers/: menangani request dan response
+- models/: menjalankan query ke database
+- middleware/: menangani autentikasi, upload file, dan otorisasi
+- config/: konfigurasi database, OAuth, dan payment
+- services/: layanan bisnis seperti Midtrans
+- database/: inisialisasi tabel dan seed data
+
+### Diagram alur umum
+
+1. Client mengirim request ke endpoint tertentu
+2. Router memanggil controller yang sesuai
+3. Controller memvalidasi input dan memanggil model
+4. Model mengakses MySQL
+5. Hasil dikembalikan ke client dalam format JSON
+6. Untuk pembayaran, Midtrans mengirim notifikasi webhook ke backend untuk update status transaksi
+
+## 4. Struktur folder proyek
+
 ```text
-src/
-  app.js
-  config/
-    database.js
-    oauth2.js
-  controllers/
-    auth.js
-    product.js
-    transaction.js
-    user.js
-  database/
-    init.js
-    seeders/
-      productSeeder.js
-  middleware/
-    auth.js
-    productUpload.js
-    upload.js
-  models/
-    auth.js
-    product.js
-    transaction.js
-    user.js
-  routes/
-    auth.js
-    product.js
-    transaction.js
-    user.js
-public/
-  uploads/
-    profiles/
-    products/
+restfull-api/
+├── src/
+│   ├── app.js
+│   ├── config/
+│   │   ├── database.js
+│   │   ├── oauth2.js
+│   │   ├── payment.js
+│   │   └── ...
+│   ├── controllers/
+│   │   ├── auth.js
+│   │   ├── product.js
+│   │   ├── transaction.js
+│   │   ├── user.js
+│   │   └── payment.js
+│   ├── database/
+│   │   ├── init.js
+│   │   └── seeders/
+│   │       └── productSeeder.js
+│   ├── middleware/
+│   │   ├── auth.js
+│   │   ├── productUpload.js
+│   │   └── upload.js
+│   ├── models/
+│   │   ├── auth.js
+│   │   ├── product.js
+│   │   ├── transaction.js
+│   │   └── user.js
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── payment.js
+│   │   ├── product.js
+│   │   ├── transaction.js
+│   │   └── user.js
+│   ├── services/
+│   │   └── midtrans.js
+│   └── uploads/
+│       ├── products/
+│       └── profiles/
+├── test/
+│   ├── auth-availability.test.js
+│   ├── midtrans.test.js
+│   └── transaction-race.test.js
+├── package.json
+├── README.md
+└── public/
 ```
 
-## ⚙️ Persiapan environment
-Buat file .env di root project dengan isi berikut:
-```env
-PORT=8000
-HOST=localhost
-USER=root
-PASSWORD=
-DATABASE=restfull-api
-JWT_SECRET=your_secret_key_here
-MIDTRANS_SERVER_KEY=your_midtrans_server_key
-MIDTRANS_CLIENT_KEY=your_midtrans_client_key
-MIDTRANS_IS_PRODUCTION=false
-FRONTEND_URL=http://localhost:5173
-```
+## 5. Penjelasan komponen utama
 
-`MIDTRANS_SERVER_KEY` dan `MIDTRANS_CLIENT_KEY` diperoleh dari dashboard
-Midtrans. Jangan memasukkan server key ke frontend, source control, atau
-response API. File `.env` tidak perlu dibagikan.
+### 5.1 Entry point aplikasi
+File utama aplikasi adalah [src/app.js](src/app.js). File ini:
+- membuat instance Express
+- mengaktifkan JSON parser
+- menyambungkan static file folder publik
+- mengaktifkan CORS
+- mendaftarkan semua route utama
+- menjalankan server pada port yang ditentukan
 
-> Pastikan MySQL sudah berjalan dan database yang disebutkan tersedia.
+Application route utama:
+- /auth
+- /users
+- /products
+- /transactions
+- /payments
 
-## ▶️ Cara menjalankan proyek
-1. Install dependency
-```bash
-npm install
-```
+### 5.2 Middleware autentikasi
+File [src/middleware/auth.js](src/middleware/auth.js) berisi:
+- verifyToken: memeriksa keberadaan token JWT dan memvalidasinya
+- authorizeRoles: mengontrol akses berdasarkan role seperti ADMIN atau USER
 
-2. Jalankan inisialisasi database
-```bash
-npm run db:init
-```
+Semua endpoint sensitif pada user, produk admin, dan transaksi memerlukan otorisasi ini.
 
-3. Jalankan seed produk awal (20 produk sample)
-```bash
-node src/database/seeders/productSeeder.js
-```
+### 5.3 Upload file
+Proyek ini menggunakan multer untuk mengelola upload file:
+- [src/middleware/upload.js](src/middleware/upload.js): untuk upload foto profil
+- [src/middleware/productUpload.js](src/middleware/productUpload.js): untuk upload gambar produk
 
-4. Jalankan server
-```bash
-npm run dev
-```
+File yang diupload kemudian disimpan ke folder publik dan path disimpan di database.
 
-Server akan berjalan di:
-```text
-http://localhost:8000
-```
+### 5.4 Model dan database
+Model berada di [src/models](src/models). Setiap file model berisi query SQL untuk mengelola data tertentu:
+- user.js: query user
+- product.js: query produk
+- transaction.js: query transaksi dan status pembayaran
+- auth.js: query pengecekan username/email dan pendaftaran akun
 
-## 🗄️ Struktur database
-Beberapa tabel yang dibuat secara otomatis oleh script inisialisasi:
-- users
-- products
-- transactions
-- transaction_items
+Database connection dibuat di [src/config/database.js](src/config/database.js), menggunakan MySQL pool.
 
-### Tabel users
-- id
-- name
-- username
-- email
-- password
-- role
-- profile_picture
-- auth_provider
-- createdAt
-- updatedAt
+### 5.5 Inisialisasi database
+File [src/database/init.js](src/database/init.js) berfungsi untuk:
+- memastikan database utama dibuat
+- membuat tabel users, products, transactions, dan transaction_items
+- menambahkan kolom yang diperlukan jika belum ada
+- menambahkan indeks unik pada order_id transaksi
+- menghindari penghapusan data lama saat struktur tabel sudah ada
 
-### Tabel products
-- id
-- name
-- description
-- price
-- stock
-- reserved_stock
-- image
-- createdAt
-- updatedAt
+### 5.6 Seeder produk
+File [src/database/seeders/productSeeder.js](src/database/seeders/productSeeder.js) digunakan untuk memasukkan data produk awal ke database.
 
-### Tabel transactions
-- id
-- user_id
-- order_id
-- payment_provider
-- total_amount
-- status
-- payment_status
-- payment_token
-- payment_expiry
-- paid_at
-- createdAt
-- updatedAt
+## 6. Alur autentikasi
 
-### Tabel transaction_items
-- id
-- transaction_id
-- product_id
-- quantity
-- price
-- createdAt
+### Login lokal
+Flow yang terjadi:
+1. Client mengirim identifier dan password ke /auth/login
+2. Controller mengecek apakah user ada di database
+3. Password dibandingkan dengan hash bcrypt
+4. Jika valid, backend menghasilkan JWT
+5. Token dikirim kembali ke client
 
-## 🔐 Autentikasi
-Semua endpoint yang membutuhkan akses pribadi menggunakan header berikut:
+### JWT
+Setelah login, client harus mengirim header seperti berikut:
+
 ```http
 Authorization: Bearer <token>
 ```
 
-Token didapatkan dari endpoint login atau register.
+### Google OAuth
+Aplikasi juga mendukung login via Google:
+- GET /auth/google -> redirect ke Google consent screen
+- GET /auth/google/callback -> proses token Google dan membuat akun otomatis jika belum ada
+- Token internal dibuat dan diarahkan kembali ke frontend
 
-## 📚 Daftar endpoint
+## 7. Endpoint API
 
-### 1. Auth
+### 7.1 Auth
 
-| Method | Endpoint | Akses | Keterangan |
-|---|---|---|---|
-| GET | /auth/google | Publik | Redirect ke OAuth Google |
-| GET | /auth/google/callback | Publik | Callback OAuth Google |
-| POST | /auth/register | Publik | Registrasi user baru |
-| POST | /auth/login | Publik | Login user dan dapatkan JWT |
+#### 1) POST /auth/check-availability
+Cek apakah username atau email sudah dipakai.
 
-#### Contoh request register
+Request:
+```json
+{
+  "username": "budi123",
+  "email": "budi@example.com"
+}
+```
+
+Response sukses:
+```json
+{
+  "success": true,
+  "available": true,
+  "duplicates": [],
+  "message": "Username and email are available"
+}
+```
+
+#### 2) POST /auth/register
+Registrasi user baru.
+
+Request:
 ```json
 {
   "name": "Budi",
@@ -196,7 +218,10 @@ Token didapatkan dari endpoint login atau register.
 }
 ```
 
-#### Contoh request login
+#### 3) POST /auth/login
+Login user.
+
+Request:
 ```json
 {
   "identifier": "budi123",
@@ -204,76 +229,113 @@ Token didapatkan dari endpoint login atau register.
 }
 ```
 
+Response:
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "id": 1,
+    "name": "Budi",
+    "username": "budi123",
+    "email": "budi@example.com",
+    "role": "USER"
+  },
+  "token": "jwt-token"
+}
+```
+
+#### 4) GET /auth/google
+Redirect ke OAuth Google.
+
+#### 5) GET /auth/google/callback
+Callback setelah login Google berhasil.
+
 ---
 
-### 2. User
+### 7.2 User
+Semua route user memerlukan token, dan beberapa route hanya bisa diakses ADMIN.
 
-| Method | Endpoint | Akses | Keterangan |
-|---|---|---|---|
-| GET | /users | ADMIN | Ambil semua user |
-| GET | /users/:id | ADMIN / USER | Ambil detail user |
-| POST | /users | ADMIN | Buat user baru |
-| PATCH | /users/:id | ADMIN | Update data user |
-| DELETE | /users/:id | ADMIN | Hapus user |
+#### GET /users
+Ambil seluruh user.
+Akses: ADMIN
 
-#### Upload foto profil
-Untuk route POST/PATCH /users, gunakan form-data dengan field:
-- profile_picture
+#### GET /users/:id
+Ambil detail user berdasarkan id.
+Akses: USER atau ADMIN yang memiliki token valid
 
-Contoh form-data:
-- field: profile_picture
-- value: file gambar
+#### POST /users
+Membuat user baru.
+Akses: ADMIN
+
+Body form-data:
+- name
+- username
+- email
+- password
+- role
+- profile_picture (opsional)
+
+#### PATCH /users/:id
+Update data user.
+Akses: ADMIN
+
+Body bisa berupa JSON atau form-data jika upload foto.
+
+#### DELETE /users/:id
+Hapus user.
+Akses: ADMIN
 
 ---
 
-### 3. Product
+### 7.3 Product
+Produk dapat diakses publik untuk melihat katalog, namun pembuatan, update, dan hapus hanya admin.
 
-| Method | Endpoint | Akses | Keterangan |
-|---|---|---|---|
-| GET | /products | Publik | Ambil list produk dengan pagination dan search |
-| GET | /products/:id | Publik | Ambil detail produk |
-| POST | /products | ADMIN | Tambah produk baru |
-| PATCH | /products/:id | ADMIN | Update produk |
-| DELETE | /products/:id | ADMIN | Hapus produk |
+#### GET /products
+Ambil produk dengan pencarian dan paginasi.
 
-#### Query parameter untuk GET /products
-- search: kata kunci pencarian (nama/deskripsi)
+Query params:
+- search: string pencarian nama/description
 - page: nomor halaman
-- limit: jumlah data per halaman
+- limit: jumlah item per halaman
 
 Contoh:
-```text
+```http
 GET /products?search=laptop&page=1&limit=10
 ```
 
-#### Contoh request create product
-Gunakan form-data:
+#### GET /products/:id
+Ambil detail produk satu item.
+
+#### POST /products
+Tambah produk baru.
+Akses: ADMIN
+
+Body form-data:
 - name
 - description
 - price
 - stock
-- image
+- image (opsional)
 
-Contoh body JSON untuk API client yang mendukung multipart:
-```text
-name: Laptop Acer
-description: Laptop ringan untuk kerja
-price: 7990000
-stock: 10
-image: file gambar
-```
+#### PATCH /products/:id
+Update produk.
+Akses: ADMIN
+
+#### DELETE /products/:id
+Hapus produk.
+Akses: ADMIN
 
 ---
 
-### 4. Transaction
+### 7.4 Transaction
+Transaksi dibuat oleh user yang sudah login. Sistem ini menambahkan reservasi stok sebelum pembayaran selesai.
 
-| Method | Endpoint | Akses | Keterangan |
-|---|---|---|---|
-| POST | /transactions | USER / ADMIN | Buat transaksi pembelian |
-| GET | /transactions | USER / ADMIN | Ambil riwayat transaksi user login |
-| GET | /transactions/:orderId | USER / ADMIN | Ambil status order milik user login |
+#### POST /transactions
+Buat pesanan baru.
+Akses: USER atau ADMIN
 
-#### Contoh request create transaction
+Request:
 ```json
 {
   "items": [
@@ -289,12 +351,11 @@ image: file gambar
 }
 ```
 
-#### Response create transaction
-Order yang berhasil dibuat berstatus `pending` dan mengembalikan Snap Token:
-
+Response contoh:
 ```json
 {
   "success": true,
+  "message": "Payment created successfully",
   "data": {
     "transactionId": 12,
     "orderId": "ORDER-1710000000000-ABC123",
@@ -306,98 +367,210 @@ Order yang berhasil dibuat berstatus `pending` dan mengembalikan Snap Token:
 }
 ```
 
-#### Aturan stok dan status
-- Harga dan total selalu dihitung dari database, bukan dipercaya dari request.
-- `reserved_stock` bertambah saat order pending dibuat.
-- Stok fisik baru dikurangi saat webhook menyatakan pembayaran sukses.
-- Pembayaran `deny`, `cancel`, `failure`, atau `expire` melepas reservasi.
-- Webhook duplikat aman diproses ulang dan tidak mengurangi stok dua kali.
-- Callback JavaScript dari Snap hanya untuk tampilan; webhook adalah sumber kebenaran.
+#### GET /transactions
+Ambil semua transaksi milik user yang sedang login.
+
+#### GET /transactions/:orderId
+Ambil status transaksi berdasarkan orderId milik user login.
 
 ---
 
-### 5. Payment Midtrans Snap
+### 7.5 Payment Midtrans
 
-#### Setup Sandbox
-1. Buat akun merchant di [dashboard Midtrans](https://dashboard.midtrans.com/).
-2. Aktifkan mode Sandbox dan salin Server Key serta Client Key.
-3. Isi variable environment yang tercantum pada bagian persiapan environment.
-4. Jalankan database initialization dengan `npm run db:init`.
-5. Pastikan backend dapat diakses melalui HTTPS publik untuk webhook. Saat lokal,
-   gunakan tunnel seperti ngrok atau Cloudflare Tunnel.
-6. Daftarkan URL berikut di pengaturan HTTP Notification Midtrans:
+#### POST /payments/midtrans/notification
+Endpoint untuk menerima webhook dari Midtrans.
 
+Webhook ini berperan penting karena merupakan sumber kebenaran untuk status pembayaran. Backend akan mengecek:
+- order_id
+- gross_amount
+- signature_key
+- status transaksi
+
+Jika valid, sistem akan mengubah status transaksi dan menyesuaikan stok produk.
+
+## 8. Mekanisme stok dan transaksi
+
+Salah satu fitur penting dari backend ini adalah pengelolaan stok yang aman terhadap race condition.
+
+### Flow stok
+1. Saat transaksi dibuat, produk yang dibeli dicek ketersediaan dan jumlah reservasinya.
+2. Sistem menambahkan nilai ke field reserved_stock.
+3. Status transaksi dibuat sebagai pending.
+4. Saat pembayaran menerima notifikasi berhasil, stok fisik dikurangi dan reservasi dikurangi.
+5. Saat pembayaran gagal/expired, reservasi dibatalkan.
+
+### Keuntungan pendekatan ini
+- mencegah overselling saat beberapa user membeli item yang sama
+- menjaga konsistensi data produk dan transaksi
+- memudahkan penanganan webhook ganda
+
+## 9. Contoh penggunaan API via cURL
+
+### Registrasi
+```bash
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Budi",
+    "username": "budi123",
+    "email": "budi@example.com",
+    "password": "rahasia123"
+  }'
+```
+
+### Login
+```bash
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "identifier": "budi123",
+    "password": "rahasia123"
+  }'
+```
+
+### Ambil semua produk
+```bash
+curl http://localhost:8000/products?search=laptop&page=1&limit=10
+```
+
+### Buat transaksi
+```bash
+curl -X POST http://localhost:8000/transactions \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      { "productId": 1, "quantity": 2 },
+      { "productId": 3, "quantity": 1 }
+    ]
+  }'
+```
+
+### Cek status transaksi
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8000/transactions/ORDER-1710000000000-ABC123
+```
+
+## 10. Cara menjalankan proyek
+
+1. Instal dependency:
+```bash
+npm install
+```
+
+2. Siapkan koneksi database dan konfigurasi aplikasi sesuai kebutuhan proyek.
+
+3. Jalankan inisialisasi database:
+```bash
+npm run db:init
+```
+
+4. Jalankan seeder produk awal:
+```bash
+node src/database/seeders/productSeeder.js
+```
+
+5. Jalankan server development:
+```bash
+npm run dev
+```
+
+Server biasanya berjalan pada:
 ```text
-https://alamat-tunnel-anda.example.com/payments/midtrans/notification
+http://localhost:8000
 ```
 
-#### Membuka Snap di frontend
-Muat Snap JS sesuai mode Sandbox/Production menggunakan Client Key, kemudian
-gunakan token dari `POST /transactions`:
+## 11. Struktur database
 
-```html
-<script src="https://app.sandbox.midtrans.com/snap/snap.js"
-  data-client-key="MIDTRANS_CLIENT_KEY"></script>
-<script>
-  window.snap.pay(data.token, {
-    onSuccess: function () { refreshOrderStatus(data.orderId); },
-    onPending: function () { refreshOrderStatus(data.orderId); },
-    onError: function () { refreshOrderStatus(data.orderId); }
-  });
-</script>
+Tabel utama:
+- users
+- products
+- transactions
+- transaction_items
+
+### users
+- id
+- name
+- username
+- email
+- password
+- role
+- profile_picture
+- auth_provider
+- createdAt
+- updatedAt
+
+### products
+- id
+- name
+- description
+- price
+- stock
+- reserved_stock
+- image
+- createdAt
+- updatedAt
+
+### transactions
+- id
+- user_id
+- order_id
+- payment_provider
+- total_amount
+- status
+- payment_status
+- payment_token
+- payment_expiry
+- paid_at
+- createdAt
+- updatedAt
+
+### transaction_items
+- id
+- transaction_id
+- product_id
+- quantity
+- price
+- createdAt
+
+## 12. Catatan keamanan
+
+Beberapa prinsip keamanan yang diterapkan:
+- Password di-hash sebelum disimpan
+- Token JWT dipakai untuk mengautentikasi request
+- Role-based authorization membatasi akses endpoint admin
+- Validasi input dilakukan di controller
+- Webhook Midtrans diperiksa signature agar aman dari request palsu
+- Upload file dibatasi dengan tipe dan ukuran tertentu
+
+## 13. Testing
+
+Proyek sudah memiliki uji otomatis di folder test/. Untuk menjalankan semua test:
+
+```bash
+npm test
 ```
 
-Frontend harus mengirim header autentikasi saat membuat order:
+Fitur yang diuji mencakup:
+- pengecekan ketersediaan username/email
+- validasi signature Midtrans
+- mapping status pembayaran
+- reservasi stok dan race condition
+- transaksi yang gagal, sukses, dan duplikat
 
-```http
-POST /transactions
-Authorization: Bearer <JWT>
-Content-Type: application/json
-```
+## 14. Kesimpulan
 
-Status dapat diperiksa kembali melalui:
+Backend ini merupakan aplikasi e-commerce sederhana namun solid. Sistem ini sudah mendukung kebutuhan dasar untuk produk, users, autentikasi, transaksi, dan pembayaran online. Kelebihan utamanya terletak pada pengelolaan stok yang dilakukan secara hati-hati agar tidak terjadi overselling dan memastikan konsistensi data saat proses pembayaran berjalan.
 
-```http
-GET /transactions/ORDER-1710000000000-ABC123
-Authorization: Bearer <JWT>
-```
+Jika Anda ingin pengembangan lanjutan, area yang bisa ditingkatkan selanjutnya adalah:
+- paginasi yang lebih fleksibel
+- logging dan monitoring request
+- sistem refund yang lebih lengkap
+- dokumentasi OpenAPI/Swagger
+- unit test yang lebih luas untuk seluruh controller
+- implementasi queue job untuk webhook atau notifikasi email
 
-#### Status webhook
-
-| Status Midtrans | Status API | Dampak |
-|---|---|---|
-| `capture`, `settlement` | `paid` | Stok fisik dikurangi sekali |
-| `pending` | `pending` | Reservasi tetap aktif |
-| `deny`, `cancel`, `failure` | `failed` | Reservasi dilepas |
-| `expire` | `expired` | Reservasi dilepas |
-| `refund`, `partial_refund` | `refunded` | Status refund dicatat |
-
-Webhook memverifikasi `signature_key` menggunakan SHA-512 dari:
-`order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY`.
-Webhook dengan signature, order ID, atau nominal yang tidak cocok akan ditolak.
-
-#### Production checklist
-- Ganti `MIDTRANS_IS_PRODUCTION` menjadi `true` dan gunakan key Production.
-- Gunakan HTTPS untuk API dan notification URL.
-- Simpan key pada environment/secret manager server.
-- Jangan menandai order paid dari redirect atau callback frontend.
-- Pantau webhook gagal dan siapkan job untuk membersihkan reservasi order yang
-  kedaluwarsa.
-- Uji pembayaran settlement, pending, expire, deny, dan refund sebelum rilis.
-
----
-
-## 📦 Response format
-Secara umum, response API mengikuti format berikut:
-
-### Success
-```json
-{
-  "success": true,
-  "message": "Operasi berhasil",
-  "data": {}
-}
-```
 
 ### Error
 ```json
