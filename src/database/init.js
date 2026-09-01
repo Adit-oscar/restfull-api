@@ -1,7 +1,7 @@
 const mysql = require("mysql2/promise");
 const env = require("dotenv");
 
-// PENTING: Load env di paling atas
+// Load env di paling atas
 env.config();
 
 const tableExists = async (dbPool, tableName) => {
@@ -24,8 +24,8 @@ const columnExists = async (dbPool, tableName, columnName) => {
     `SELECT COUNT(*) AS total
      FROM information_schema.columns
      WHERE table_schema = DATABASE()
-       AND table_name = ?
-       AND column_name = ?`,
+        AND table_name = ?
+        AND column_name = ?`,
     [tableName, columnName],
   );
   return rows[0].total > 0;
@@ -50,8 +50,8 @@ const indexExists = async (dbPool, tableName, indexName) => {
     `SELECT COUNT(*) AS total
      FROM information_schema.statistics
      WHERE table_schema = DATABASE()
-       AND table_name = ?
-       AND index_name = ?`,
+        AND table_name = ?
+        AND index_name = ?`,
     [tableName, indexName],
   );
   return rows[0].total > 0;
@@ -64,18 +64,19 @@ const recreateEmptyTable = async (dbPool, tableName) => {
       return;
     }
 
-    await dbPool.execute(`DROP TABLE \`${tableName}\``);
+    await dbPool.execute(`DROP TABLE IF EXISTS \`${tableName}\``);
     console.log(`Tabel ${tableName} kosong; tabel dihapus untuk dibuat ulang`);
   }
 };
 
 async function initialDatabase() {
   let tempConnection;
+  let dbPool;
 
   try {
     console.log("Memulai inisialisasi database...");
 
-    // 1. Buat koneksi sementara tanpa menyertakan opsi database
+    // 1. Koneksi sementara tanpa nama database
     tempConnection = await mysql.createConnection({
       user: process.env.USER,
       host: process.env.HOST,
@@ -85,20 +86,19 @@ async function initialDatabase() {
     const dbName = process.env.DATABASE;
     console.log(`Menyiapkan database: ${dbName}`);
 
-    // Perbaikan: Gunakan backtick `` dan IF NOT EXISTS (pakai S)
     await tempConnection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
     console.log(`Database ${dbName} berhasil dipastikan ada`);
 
-    // Tutup koneksi sementara
     await tempConnection.end();
+    tempConnection = null;
 
     console.log("Menghubungkan ke database melalui dbPool...");
+    dbPool = require("../config/database");
 
-    // Perbaikan: Impor dbPool DI SINI (setelah database dipastikan ada)
-    const dbPool = require("../config/database");
+    // Matikan pengecekan Foreign Key sementara
+    await dbPool.execute("SET FOREIGN_KEY_CHECKS = 0");
 
-    // Hapus hanya tabel kosong. Data pada tabel yang sudah digunakan tidak dihapus.
-    // Urutan terbalik menjaga foreign key transaction_items -> transactions/products.
+    // Hapus tabel kosong jika ada
     for (const tableName of [
       "transaction_items",
       "transactions",
@@ -108,8 +108,12 @@ async function initialDatabase() {
       await recreateEmptyTable(dbPool, tableName);
     }
 
-    // Perbaikan: Tambahkan koma setelah kolom createdAt dan gunakan IF NOT EXISTS
-    const queryCreateTableUser = `
+    // Hidupkan kembali pengecekan Foreign Key
+    await dbPool.execute("SET FOREIGN_KEY_CHECKS = 1");
+
+    // 2. Pembuatan Tabel (Schema Utama)
+    console.log("Membuat tabel users...");
+    await dbPool.execute(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255),
@@ -122,13 +126,10 @@ async function initialDatabase() {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       );
-    `;
+    `);
 
-    console.log("Membuat tabel users...");
-    await dbPool.execute(queryCreateTableUser);
-    console.log("Tabel users berhasil dibuat/diverifikasi");
-
-    const queryCreateTableProducts = `
+    console.log("Membuat tabel products...");
+    await dbPool.execute(`
       CREATE TABLE IF NOT EXISTS products (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -140,13 +141,10 @@ async function initialDatabase() {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       );
-    `;
+    `);
 
-    console.log("Membuat tabel products...");
-    await dbPool.execute(queryCreateTableProducts);
-    console.log("Tabel products berhasil dibuat/diverifikasi");
-
-    const queryCreateTableTransactions = `
+    console.log("Membuat tabel transactions...");
+    await dbPool.execute(`
       CREATE TABLE IF NOT EXISTS transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
@@ -162,9 +160,10 @@ async function initialDatabase() {
         updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
       );
-    `;
+    `);
 
-    const queryCreateTableTransactionItems = `
+    console.log("Membuat tabel transaction_items...");
+    await dbPool.execute(`
       CREATE TABLE IF NOT EXISTS transaction_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
         transaction_id INT NOT NULL,
@@ -175,16 +174,9 @@ async function initialDatabase() {
         FOREIGN KEY (transaction_id) REFERENCES transactions(id),
         FOREIGN KEY (product_id) REFERENCES products(id)
       );
-    `;
+    `);
 
-    console.log("Membuat tabel transactions...");
-    await dbPool.execute(queryCreateTableTransactions);
-    console.log("Tabel transactions berhasil dibuat/diverifikasi");
-
-    console.log("Membuat tabel transaction_items...");
-    await dbPool.execute(queryCreateTableTransactionItems);
-    console.log("Tabel transaction_items berhasil dibuat/diverifikasi");
-
+    // 3. Migrasi Kolom / Penyesuaian Struktural (Untuk Tabel Lama yang Sudah Ada Data)
     await addColumnIfMissing(
       dbPool,
       "products",
@@ -228,22 +220,11 @@ async function initialDatabase() {
       "DATETIME NULL",
     );
 
-    await dbPool.execute(
-      "ALTER TABLE transactions MODIFY COLUMN payment_provider VARCHAR(30) NOT NULL DEFAULT 'midtrans'",
-    );
-    await dbPool.execute(
-      "ALTER TABLE transactions MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'pending'",
-    );
-    await dbPool.execute(
-      "ALTER TABLE transactions MODIFY COLUMN payment_status VARCHAR(20) NOT NULL DEFAULT 'pending'",
-    );
-
+    // Perbaikan legacy data jika ada transaksi lama tanpa order_id
     await dbPool.execute(
       "UPDATE transactions SET order_id = CONCAT('LEGACY-', id) WHERE order_id IS NULL",
     );
-    await dbPool.execute(
-      "ALTER TABLE transactions MODIFY COLUMN order_id VARCHAR(100) NOT NULL",
-    );
+
     if (
       !(await indexExists(dbPool, "transactions", "idx_transactions_order_id"))
     ) {
@@ -255,10 +236,10 @@ async function initialDatabase() {
       );
     }
 
-    // Tutup pool agar script Node.js berhenti otomatis
-    await dbPool.end();
+    console.log("Inisialisasi database berhasil selesai.");
 
-    // Perbaikan: typo 'proccess' -> 'process', dan exit code '0' untuk sukses
+    // Tutup koneksi pool secara aman
+    await dbPool.end();
     process.exit(0);
   } catch (error) {
     console.error("Gagal melakukan inisialisasi database:", {
@@ -267,10 +248,13 @@ async function initialDatabase() {
       sqlMessage: error.sqlMessage,
       message: error.message,
     });
+
     if (tempConnection) await tempConnection.end();
+    if (dbPool) await dbPool.end();
+
     process.exit(1);
   }
 }
 
-// Panggil fungsinya
+// Jalankan skrip
 initialDatabase();

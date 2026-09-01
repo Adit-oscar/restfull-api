@@ -5,7 +5,11 @@ const model = require("../models/product.js");
 const getAllProducts = async (req, res) => {
   try {
     const { search = "", page = 1, limit = 10 } = req.query;
-    const result = await model.getAllProducts({ search, page, limit });
+    const result = await model.getAllProducts({
+      search: String(search),
+      page: parseInt(page, 10) || 1,
+      limit: parseInt(limit, 10) || 10,
+    });
 
     return res.json({
       success: true,

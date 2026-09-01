@@ -1,7 +1,9 @@
 const dbPool = require("../config/database.js");
 
 const getAllProducts = async ({ search = "", page = 1, limit = 10 } = {}) => {
-  const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+  const offsetNum = (pageNum - 1) * limitNum;
   const keyword = `%${search}%`;
 
   const query = `
@@ -12,11 +14,12 @@ const getAllProducts = async ({ search = "", page = 1, limit = 10 } = {}) => {
     LIMIT ? OFFSET ?
   `;
 
-  const [rows] = await dbPool.execute(query, [
+  // Gunakan .query() alih-alih .execute()
+  const [rows] = await dbPool.query(query, [
     keyword,
     keyword,
-    parseInt(limit, 10),
-    offset,
+    limitNum,
+    offsetNum,
   ]);
 
   const countQuery = `
@@ -25,15 +28,16 @@ const getAllProducts = async ({ search = "", page = 1, limit = 10 } = {}) => {
     WHERE name LIKE ? OR description LIKE ?
   `;
 
-  const [countRows] = await dbPool.execute(countQuery, [keyword, keyword]);
+  const [countRows] = await dbPool.query(countQuery, [keyword, keyword]);
+  const total = countRows[0]?.total || 0;
 
   return {
     data: rows,
     pagination: {
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
-      total: countRows[0].total,
-      totalPages: Math.ceil(countRows[0].total / parseInt(limit, 10)),
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.ceil(total / limitNum),
     },
   };
 };
